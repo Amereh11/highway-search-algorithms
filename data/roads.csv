@@ -1,0 +1,21 @@
+city_a,city_b,driving_miles,source
+"Chicago, IL","Indianapolis, IN",184,starter_demo_value
+"Chicago, IL","Milwaukee, WI",92,starter_demo_value
+"Chicago, IL","Detroit, MI",283,starter_demo_value
+"Chicago, IL","St. Louis, MO",297,starter_demo_value
+"Indianapolis, IN","Columbus, OH",176,starter_demo_value
+"Indianapolis, IN","Louisville, KY",114,starter_demo_value
+"Indianapolis, IN","St. Louis, MO",243,starter_demo_value
+"Columbus, OH","Detroit, MI",203,starter_demo_value
+"Columbus, OH","Pittsburgh, PA",185,starter_demo_value
+"Columbus, OH","Louisville, KY",207,starter_demo_value
+"Detroit, MI","Pittsburgh, PA",286,starter_demo_value
+"Milwaukee, WI","St. Louis, MO",372,starter_demo_value
+"St. Louis, MO","Louisville, KY",260,starter_demo_value
+"Louisville, KY","Nashville, TN",175,starter_demo_value
+"Nashville, TN","Atlanta, GA",250,starter_demo_value
+"Nashville, TN","Charlotte, NC",409,starter_demo_value
+"Atlanta, GA","Charlotte, NC",245,starter_demo_value
+"Pittsburgh, PA","New York, NY",370,starter_demo_value
+"Pittsburgh, PA","Charlotte, NC",448,starter_demo_value
+"Charlotte, NC","New York, NY",630,starter_demo_value
