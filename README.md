@@ -57,7 +57,8 @@ highway-search-algorithms/
 ├── data/
 │   ├── cities.csv
 │   ├── roads.csv
-│   └── google_maps_collected.csv
+│   ├── google_maps_collected.csv
+│   └── DATA_NOTES.md
 ├── src/
 │   ├── __init__.py
 │   ├── graph.py
@@ -67,7 +68,8 @@ highway-search-algorithms/
 │   └── test_search.py
 ├── docs/
 │   ├── REPORT_OUTLINE.md
-│   └── PRESENTATION_OUTLINE.md
+│   ├── PRESENTATION_OUTLINE.md
+│   └── FINAL_RESULTS.md
 └── outputs/
     └── .gitkeep
 ```
