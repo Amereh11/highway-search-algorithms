@@ -1,164 +1,137 @@
-from __future__ import annotations
+# Project: Highway Search Algorithms - Intro to Artificial Intelligence
+# Project team: Motasem Amereh, Tamanna Devi, Manjot Singh,
+#               Thomas Zangrilli, Parv Alphonso Bhatia
+# Version: 3.0 (matrix-based review draft)
+# Updated: 2026-10-08
+# Purpose: Compare four searches using the graph's two-dimensional road array.
 
 from collections import deque
 from dataclasses import dataclass
 import heapq
-from itertools import count
 from math import inf
-
-from .graph import HighwayGraph
 
 
 @dataclass
 class SearchResult:
-    path: list[str] | None
-    distance: float
-    expanded: list[str]
+    path: list          # City names in the route, or None if unreachable.
+    distance: float     # Total driving miles on the selected route.
+    expanded: list      # Order in which cities were taken from the frontier.
 
 
-def _reconstruct_path(parent: dict[str, str | None], goal: str) -> list[str]:
-    path = []
-    current: str | None = goal
-
-    while current is not None:
-        path.append(current)
+def make_result(graph, parent, goal, expanded, distance=None):
+    """Follow parent indices backward, then convert indices to city names."""
+    indices = []
+    current = goal
+    while current != -1:
+        indices.append(current)
         current = parent[current]
+    path = [graph.names[index] for index in reversed(indices)]
+    miles = graph.path_distance(path) if distance is None else distance
+    return SearchResult(path, miles, [graph.names[i] for i in expanded])
 
-    path.reverse()
-    return path
+
+def no_route(graph, expanded):
+    return SearchResult(None, inf, [graph.names[i] for i in expanded])
 
 
-def bfs(graph: HighwayGraph, start: str, goal: str) -> SearchResult:
-    graph.validate_city(start)
-    graph.validate_city(goal)
-
-    queue = deque([start])
-    parent: dict[str, str | None] = {start: None}
-    expanded: list[str] = []
+def bfs(graph, start, goal):
+    """BFS: explore cities level by level using a first-in, first-out queue."""
+    first, target = graph.city_index(start), graph.city_index(goal)
+    visited = [False] * len(graph.names)  # One boolean per matrix row.
+    parent = [-1] * len(graph.names)
+    queue = deque([first])
+    expanded = []
+    visited[first] = True
 
     while queue:
-        current = queue.popleft()
-        expanded.append(current)
+        city = queue.popleft()
+        expanded.append(city)
+        if city == target:
+            return make_result(graph, parent, target, expanded)
 
-        if current == goal:
-            path = _reconstruct_path(parent, goal)
-            return SearchResult(path, graph.path_distance(path), expanded)
-
-        for neighbor, _ in graph.neighbors(current):
-            if neighbor not in parent:
-                parent[neighbor] = current
-                queue.append(neighbor)
-
-    return SearchResult(None, inf, expanded)
+        # Each matrix column is a possible neighbor.
+        for next_city, miles in graph.neighbors(city):
+            if not visited[next_city]:
+                visited[next_city] = True
+                parent[next_city] = city
+                queue.append(next_city)
+    return no_route(graph, expanded)
 
 
-def dfs(graph: HighwayGraph, start: str, goal: str) -> SearchResult:
-    graph.validate_city(start)
-    graph.validate_city(goal)
-
-    stack = [start]
-    parent: dict[str, str | None] = {start: None}
-    visited: set[str] = set()
-    expanded: list[str] = []
+def dfs(graph, start, goal):
+    """DFS: use a stack to explore one branch before backtracking."""
+    first, target = graph.city_index(start), graph.city_index(goal)
+    visited = [False] * len(graph.names)
+    parent = [-1] * len(graph.names)
+    stack = [(first, -1)]  # (city, parent); fix parent when visiting.
+    expanded = []
 
     while stack:
-        current = stack.pop()
-
-        if current in visited:
+        city, previous = stack.pop()
+        if visited[city]:
             continue
+        visited[city] = True
+        parent[city] = previous
+        expanded.append(city)
+        if city == target:
+            return make_result(graph, parent, target, expanded)
 
-        visited.add(current)
-        expanded.append(current)
-
-        if current == goal:
-            path = _reconstruct_path(parent, goal)
-            return SearchResult(path, graph.path_distance(path), expanded)
-
-        # Reverse sorted order so alphabetically earlier neighbors are
-        # processed first when popped from the LIFO stack.
-        for neighbor, _ in reversed(graph.neighbors(current)):
-            if neighbor not in visited and neighbor not in parent:
-                parent[neighbor] = current
-                stack.append(neighbor)
-
-    return SearchResult(None, inf, expanded)
+        # Reverse the neighbors because the last stack entry is visited first.
+        for next_city, miles in reversed(graph.neighbors(city)):
+            if not visited[next_city]:
+                stack.append((next_city, city))
+    return no_route(graph, expanded)
 
 
-def ucs(graph: HighwayGraph, start: str, goal: str) -> SearchResult:
-    graph.validate_city(start)
-    graph.validate_city(goal)
+def ucs(graph, start, goal):
+    """UCS: expand the city with the smallest driving cost so far."""
+    first, target = graph.city_index(start), graph.city_index(goal)
+    best = [inf] * len(graph.names)
+    parent = [-1] * len(graph.names)
+    queue = [(0, first)]  # (driving cost, city index).
+    expanded = []
+    best[first] = 0
 
-    tie_breaker = count()
-    frontier = [(0.0, next(tie_breaker), start)]
-    best_cost = {start: 0.0}
-    parent: dict[str, str | None] = {start: None}
-    expanded: list[str] = []
-    closed: set[str] = set()
-
-    while frontier:
-        cost, _, current = heapq.heappop(frontier)
-
-        if current in closed:
+    while queue:
+        cost, city = heapq.heappop(queue)
+        if cost != best[city]:  # Ignore a more expensive old entry.
             continue
+        expanded.append(city)
+        if city == target:
+            return make_result(graph, parent, target, expanded, cost)
 
-        closed.add(current)
-        expanded.append(current)
-
-        if current == goal:
-            path = _reconstruct_path(parent, goal)
-            return SearchResult(path, cost, expanded)
-
-        for neighbor, edge_cost in graph.neighbors(current):
-            new_cost = cost + edge_cost
-
-            if new_cost < best_cost.get(neighbor, inf):
-                best_cost[neighbor] = new_cost
-                parent[neighbor] = current
-                heapq.heappush(
-                    frontier,
-                    (new_cost, next(tie_breaker), neighbor),
-                )
-
-    return SearchResult(None, inf, expanded)
+        for next_city, miles in graph.neighbors(city):
+            new_cost = cost + miles
+            if new_cost < best[next_city]:
+                best[next_city] = new_cost
+                parent[next_city] = city
+                heapq.heappush(queue, (new_cost, next_city))
+    return no_route(graph, expanded)
 
 
-def astar(graph: HighwayGraph, start: str, goal: str) -> SearchResult:
-    graph.validate_city(start)
-    graph.validate_city(goal)
+def astar(graph, start, goal):
+    """A*: select the smallest f(n) = g(n) + h(n)."""
+    first, target = graph.city_index(start), graph.city_index(goal)
+    best = [inf] * len(graph.names)
+    parent = [-1] * len(graph.names)
+    expanded = []
+    best[first] = 0
+    # A queue entry stores (f, g, city). g is driving miles already traveled.
+    queue = [(graph.estimate(first, target), 0, first)]
 
-    tie_breaker = count()
-    start_h = graph.heuristic_miles(start, goal)
-
-    frontier = [(start_h, 0.0, next(tie_breaker), start)]
-    best_g = {start: 0.0}
-    parent: dict[str, str | None] = {start: None}
-    expanded: list[str] = []
-    closed: set[str] = set()
-
-    while frontier:
-        _, g_cost, _, current = heapq.heappop(frontier)
-
-        if current in closed:
+    while queue:
+        priority, cost, city = heapq.heappop(queue)
+        if cost != best[city]:
             continue
+        expanded.append(city)
+        if city == target:
+            return make_result(graph, parent, target, expanded, cost)
 
-        closed.add(current)
-        expanded.append(current)
-
-        if current == goal:
-            path = _reconstruct_path(parent, goal)
-            return SearchResult(path, g_cost, expanded)
-
-        for neighbor, edge_cost in graph.neighbors(current):
-            new_g = g_cost + edge_cost
-
-            if new_g < best_g.get(neighbor, inf):
-                best_g[neighbor] = new_g
-                parent[neighbor] = current
-                h = graph.heuristic_miles(neighbor, goal)
-                f = new_g + h
-                heapq.heappush(
-                    frontier,
-                    (f, new_g, next(tie_breaker), neighbor),
-                )
-
-    return SearchResult(None, inf, expanded)
+        for next_city, miles in graph.neighbors(city):
+            new_cost = cost + miles
+            if new_cost < best[next_city]:
+                best[next_city] = new_cost
+                parent[next_city] = city
+                heuristic = graph.estimate(next_city, target)
+                heapq.heappush(queue, (new_cost + heuristic, new_cost, next_city))
+    return no_route(graph, expanded)
