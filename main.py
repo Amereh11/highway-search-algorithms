@@ -1,144 +1,72 @@
-from __future__ import annotations
+"""Run BFS, DFS, UCS, and A* on the highway dataset."""
 
 import argparse
 import random
 from pathlib import Path
 
 from src.graph import HighwayGraph
-from src.search import bfs, dfs, ucs, astar
+from src.search import astar, bfs, dfs, ucs
 from src.visualization import plot_route
 
-
-ALGORITHMS = {
-    "bfs": bfs,
-    "dfs": dfs,
-    "ucs": ucs,
-    "astar": astar,
-}
+ROOT = Path(__file__).resolve().parent
+SEARCHES = {"bfs": bfs, "dfs": dfs, "ucs": ucs, "astar": astar}
 
 
-def print_result(graph: HighwayGraph, algorithm_name: str, result, start: str, goal: str) -> None:
-    print(f"\n{algorithm_name.upper()}")
-    print("-" * 60)
-
-    if result.path is None:
-        print("No route found.")
-        return
-
-    print("Path:", " -> ".join(result.path))
-    print(f"Driving distance: {result.distance:.1f} miles")
-    print(f"Nodes expanded: {len(result.expanded)}")
-    print("Expansion order:", " -> ".join(result.expanded))
-
-    straight_line = graph.heuristic_miles(start, goal)
-    flight_hours = graph.estimated_flight_time_hours(start, goal)
-    print(f"Straight-line heuristic from start: {straight_line:.1f} miles")
-    print(f"Estimated direct-flight time at 250 mph: {flight_hours:.2f} hours")
-
-
-def run_one(
-    graph: HighwayGraph,
-    start: str,
-    goal: str,
-    algorithm: str,
-    save_maps: bool,
-    output_dir: Path,
-) -> None:
-    names = list(ALGORITHMS) if algorithm == "all" else [algorithm]
-
-    print(f"\nRoute request: {start} -> {goal}")
+def run_route(graph, start, goal, selection, save_maps):
+    print(f"\nRoute: {start} -> {goal}")
+    names = list(SEARCHES) if selection == "all" else [selection]
 
     for name in names:
-        if name == "astar":
-            result = ALGORITHMS[name](graph, start, goal)
-        else:
-            result = ALGORITHMS[name](graph, start, goal)
+        result = SEARCHES[name](graph, start, goal)
+        print(f"\n{name.upper()}")
+        if result.path is None:
+            print("No route found")
+            continue
+        print("Path:", " -> ".join(result.path))
+        print(f"Driving distance: {result.distance:.0f} miles")
+        print(f"Expanded: {len(result.expanded)} cities")
+        print("Expansion order:", " -> ".join(result.expanded))
+        print(f"Straight-line estimate: {graph.heuristic_miles(start, goal):.2f} miles")
+        print(f"Flight estimate (250 mph): {graph.estimated_flight_time_hours(start, goal):.2f} hours")
 
-        print_result(graph, name, result, start, goal)
-
-        if save_maps and result.path:
-            output_dir.mkdir(parents=True, exist_ok=True)
-            safe_start = start.replace(", ", "_").replace(" ", "_")
-            safe_goal = goal.replace(", ", "_").replace(" ", "_")
-            file_path = output_dir / f"{name}_{safe_start}_to_{safe_goal}.png"
-            plot_route(
-                graph=graph,
-                path=result.path,
-                expanded=result.expanded,
-                title=f"{name.upper()}: {start} to {goal}",
-                save_path=file_path,
-            )
-            print(f"Saved map: {file_path}")
+        if save_maps:
+            folder = ROOT / "outputs"
+            folder.mkdir(exist_ok=True)
+            filename = f"{name}_{start.replace(' ', '_')}_to_{goal.replace(' ', '_')}.png"
+            plot_route(graph, result.path, result.expanded,
+                       f"{name.upper()}: {start} to {goal} ({result.distance:.0f} miles)",
+                       folder / filename)
+            print("Saved:", folder / filename)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Compare BFS, DFS, UCS, and A* on a U.S. highway graph."
-    )
-    parser.add_argument("--start", help='Start city, e.g. "Chicago, IL"')
-    parser.add_argument("--goal", help='Target city, e.g. "New York, NY"')
-    parser.add_argument(
-        "--algorithm",
-        choices=["bfs", "dfs", "ucs", "astar", "all"],
-        default="all",
-        help="Algorithm to run (default: all).",
-    )
-    parser.add_argument(
-        "--random",
-        type=int,
-        metavar="N",
-        help="Run N randomly selected start/target city pairs.",
-    )
-    parser.add_argument("--seed", type=int, default=42, help="Random seed.")
-    parser.add_argument(
-        "--save-maps",
-        action="store_true",
-        help="Save a PNG route visualization for each algorithm.",
-    )
-
+def main():
+    parser = argparse.ArgumentParser(description="Highway graph search comparison")
+    parser.add_argument("--start", help="Starting city")
+    parser.add_argument("--goal", help="Destination city")
+    parser.add_argument("--algorithm", choices=[*SEARCHES, "all"], default="all")
+    parser.add_argument("--random", type=int, metavar="N", help="Run N random city pairs")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--save-maps", action="store_true")
     args = parser.parse_args()
 
-    project_root = Path(__file__).resolve().parent
-    graph = HighwayGraph.from_csv(
-        project_root / "data" / "cities.csv",
-        project_root / "data" / "roads.csv",
-    )
-
-    if args.random:
+    graph = HighwayGraph.from_csv(ROOT / "data/cities.csv", ROOT / "data/roads.csv")
+    if args.random is not None:
         if args.random < 1:
-            parser.error("--random must be at least 1")
-
+            parser.error("--random must be 1 or greater")
         rng = random.Random(args.seed)
-        cities = graph.city_names()
-
-        print(f"Running {args.random} random city pairs with seed {args.seed}.")
-        for i in range(args.random):
-            start, goal = rng.sample(cities, 2)
-            print(f"\n{'=' * 70}\nRandom pair {i + 1}/{args.random}")
-            run_one(
-                graph,
-                start,
-                goal,
-                args.algorithm,
-                args.save_maps,
-                project_root / "outputs",
-            )
-        return
-
-    if not args.start or not args.goal:
-        parser.error("Provide both --start and --goal, or use --random N.")
-
-    graph.validate_city(args.start)
-    graph.validate_city(args.goal)
-
-    run_one(
-        graph,
-        args.start,
-        args.goal,
-        args.algorithm,
-        args.save_maps,
-        project_root / "outputs",
-    )
+        for number in range(args.random):
+            start, goal = rng.sample(graph.city_names(), 2)
+            print(f"\nRandom pair {number + 1} of {args.random}")
+            run_route(graph, start, goal, args.algorithm, args.save_maps)
+    else:
+        if not args.start or not args.goal:
+            parser.error("Provide --start and --goal, or --random N")
+        try:
+            graph.validate_city(args.start)
+            graph.validate_city(args.goal)
+        except ValueError as error:
+            parser.error(str(error))
+        run_route(graph, args.start, args.goal, args.algorithm, args.save_maps)
 
 
 if __name__ == "__main__":

@@ -1,61 +1,104 @@
+"""Checks for the data, the search strategies, and their route costs."""
+
+import heapq
 import unittest
+from math import inf
 from pathlib import Path
 
 from src.graph import HighwayGraph
-from src.search import bfs, dfs, ucs, astar
+from src.search import astar, bfs, dfs, ucs
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-
-
-class SearchAlgorithmTests(unittest.TestCase):
+class SearchTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.graph = HighwayGraph.from_csv(
-            PROJECT_ROOT / "data" / "cities.csv",
-            PROJECT_ROOT / "data" / "roads.csv",
-        )
+        cls.graph = HighwayGraph.from_csv(ROOT / "data/cities.csv", ROOT / "data/roads.csv")
 
-    def test_dataset_shape(self):
+    def test_dataset_size(self):
         self.assertEqual(len(self.graph.city_names()), 11)
-        undirected_edges = sum(len(v) for v in self.graph.adjacency.values()) // 2
-        self.assertEqual(undirected_edges, 17)
+        self.assertEqual(sum(len(v) for v in self.graph.roads.values()) // 2, 17)
 
-    def test_all_algorithms_find_route(self):
-        start = "Saint Paul"
-        goal = "New York"
+    def test_edges_are_two_way(self):
+        for city in self.graph.city_names():
+            for neighbor, miles in self.graph.neighbors(city):
+                self.assertIn((city, miles), self.graph.neighbors(neighbor))
 
-        for search in (bfs, dfs, ucs, astar):
-            result = search(self.graph, start, goal)
-            self.assertIsNotNone(result.path)
-            self.assertEqual(result.path[0], start)
-            self.assertEqual(result.path[-1], goal)
-            self.assertGreater(result.distance, 0)
+    def test_four_searches_return_valid_paths(self):
+        for method in (bfs, dfs, ucs, astar):
+            result = method(self.graph, "Saint Paul", "New York")
+            self.assertEqual(result.path[0], "Saint Paul")
+            self.assertEqual(result.path[-1], "New York")
+            self.assertEqual(self.graph.path_distance(result.path), result.distance)
 
-    def test_ucs_and_astar_have_same_optimal_cost(self):
-        start = "Saint Paul"
-        goal = "New York"
+    def test_main_shortest_route(self):
+        expected = ["Saint Paul", "Chicago", "Columbus", "Philadelphia", "New York"]
+        for method in (ucs, astar):
+            result = method(self.graph, "Saint Paul", "New York")
+            self.assertEqual(result.path, expected)
+            self.assertEqual(result.distance, 1287)
 
-        ucs_result = ucs(self.graph, start, goal)
-        astar_result = astar(self.graph, start, goal)
+    def test_all_pairs_optimal(self):
+        # Independently compute shortest distances with a small Dijkstra loop.
+        for start in self.graph.city_names():
+            distances = {start: 0}
+            frontier = [(0, start)]
+            while frontier:
+                cost, city = heapq.heappop(frontier)
+                if cost != distances[city]:
+                    continue
+                for neighbor, miles in self.graph.neighbors(city):
+                    if cost + miles < distances.get(neighbor, inf):
+                        distances[neighbor] = cost + miles
+                        heapq.heappush(frontier, (cost + miles, neighbor))
+            for goal in self.graph.city_names():
+                for method in (ucs, astar):
+                    result = method(self.graph, start, goal)
+                    self.assertAlmostEqual(result.distance, distances[goal], msg=f"{method.__name__}: {start} -> {goal}")
 
-        self.assertAlmostEqual(ucs_result.distance, astar_result.distance)
+    def test_bfs_uses_fewest_edges(self):
+        path = bfs(self.graph, "Saint Paul", "New York").path
+        self.assertEqual(len(path) - 1, 4)
 
-    def test_collected_heuristic_is_used_for_direct_pair(self):
-        self.assertAlmostEqual(
-            self.graph.heuristic_miles("Saint Paul", "Chicago"),
-            346.44,
-            places=2,
-        )
+    def test_dfs_path_has_no_repeat_cities(self):
+        path = dfs(self.graph, "Washington", "Chicago").path
+        self.assertEqual(len(path), len(set(path)))
 
-    def test_heuristic_is_zero_at_goal(self):
-        city = "Atlanta"
-        self.assertAlmostEqual(self.graph.heuristic_miles(city, city), 0.0)
+    def test_same_start_and_goal(self):
+        for method in (bfs, dfs, ucs, astar):
+            answer = method(self.graph, "Chicago", "Chicago")
+            self.assertEqual(answer.path, ["Chicago"])
+            self.assertEqual(answer.distance, 0)
 
-    def test_flight_time_formula(self):
-        h = self.graph.heuristic_miles("Saint Paul", "Chicago")
-        t = self.graph.estimated_flight_time_hours("Saint Paul", "Chicago")
-        self.assertAlmostEqual(t, h / 250.0)
+    def test_unknown_city(self):
+        with self.assertRaises(ValueError):
+            bfs(self.graph, "Atlantis", "Chicago")
+
+    def test_collected_heuristic(self):
+        self.assertAlmostEqual(self.graph.heuristic_miles("Saint Paul", "Chicago"), 346.44)
+
+    def test_heuristic_zero_at_goal(self):
+        self.assertEqual(self.graph.heuristic_miles("Chicago", "Chicago"), 0)
+
+    def test_flight_time(self):
+        h = self.graph.heuristic_miles("Chicago", "Columbus")
+        self.assertAlmostEqual(self.graph.estimated_flight_time_hours("Chicago", "Columbus"), h / 250)
+
+    def test_invalid_road(self):
+        graph = HighwayGraph()
+        graph.add_city("A", 0, 0)
+        graph.add_city("B", 0, 1)
+        with self.assertRaises(ValueError):
+            graph.add_road("A", "B", -1)
+
+    def test_duplicate_road(self):
+        graph = HighwayGraph()
+        graph.add_city("A", 0, 0)
+        graph.add_city("B", 0, 1)
+        graph.add_road("A", "B", 100)
+        with self.assertRaises(ValueError):
+            graph.add_road("A", "B", 100)
 
 
 if __name__ == "__main__":

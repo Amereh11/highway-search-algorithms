@@ -1,45 +1,38 @@
-# Final Experimental Results
+# Rechecked search results
 
-Dataset: 11 cities, 17 team-collected Google Maps road connections.
+The graph contains 11 cities and 17 undirected roads. Commands:
+```bash
+python3 -m unittest discover -s tests -v
+python3 main.py --start "Saint Paul" --goal "New York" --algorithm all --save-maps
+python3 main.py --random 5 --seed 42
+```
 
-## Main route: Saint Paul -> New York
+## Main route (Saint Paul -> New York)
 
-All four algorithms return:
+| Search | Miles | Cities expanded |
+|---|---:|---:|
+| BFS | 1287 | 11 |
+| DFS | 2356 | 10 |
+| UCS | 1287 | 10 |
+| A* | 1287 | 6 |
 
-`Saint Paul -> Chicago -> Columbus -> Philadelphia -> New York`
+BFS, UCS and A* return Saint Paul -> Chicago -> Columbus -> Philadelphia -> New York. DFS follows a longer branch through Indianapolis, Nashville, Atlanta, Columbia and Washington.
 
-Total driving distance: **1,287 miles**.
+## Five reproducible pairs (seed 42)
 
-| Algorithm | Nodes expanded |
-|---|---:|
-| BFS | 11 |
-| DFS | 5 |
-| UCS | 10 |
-| A* | 6 |
-
-Direct heuristic from Saint Paul to New York: approximately **1,007.6 miles**.
-Estimated direct-flight time at 250 mph: approximately **4.03 hours**.
-
-## Five seeded random tests (`--seed 42`)
-
-| Start | Goal | BFS | DFS | UCS | A* |
+| Start | Goal | BFS miles | DFS miles | UCS miles | A* miles |
 |---|---|---:|---:|---:|---:|
-| Washington | Chicago | 723 | 1,411 | 723 | 723 |
-| Atlanta | Indianapolis | 536 | 1,264 | 536 | 536 |
-| Columbus | Washington | 398 | 398 | 398 | 398 |
+| Washington | Chicago | 723 | 1411 | 723 | 723 |
+| Atlanta | Indianapolis | 536 | 964 | 536 | 536 |
+| Columbus | Washington | 398 | 1736 | 398 | 398 |
 | Columbia | Chicago | 933 | 933 | 933 | 933 |
-| Washington | Saint Paul | 1,121 | 1,809 | 1,121 | 1,121 |
+| Washington | Saint Paul | 1121 | 1809 | 1121 | 1121 |
 
-Average route distances:
+| Search | Average miles | Average expanded |
+|---|---:|---:|
+| BFS | 742.2 | 7.4 |
+| DFS | 1370.6 | 6.4 |
+| UCS | 742.2 | 7.6 |
+| A* | 742.2 | 3.8 |
 
-- BFS: **742.2 miles**
-- DFS: **1,163.0 miles**
-- UCS: **742.2 miles**
-- A*: **742.2 miles**
-
-Average nodes expanded:
-
-- BFS: **7.4**
-- DFS: **7.4**
-- UCS: **7.6**
-- A*: **3.8**
+These numbers were reproduced locally on the revised code. They replace the results in the earlier report for the previous DFS implementation.

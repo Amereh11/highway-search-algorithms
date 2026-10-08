@@ -1,145 +1,94 @@
-from __future__ import annotations
+"""Load the highway data and provide distances between cities."""
 
 import csv
-import math
-from dataclasses import dataclass
-from pathlib import Path
-
+from math import asin, cos, radians, sin, sqrt
 
 EARTH_RADIUS_MILES = 3958.8
-AIRPLANE_SPEED_MPH = 250.0
-
-
-@dataclass(frozen=True)
-class City:
-    name: str
-    latitude: float
-    longitude: float
+PLANE_SPEED_MPH = 250
 
 
 class HighwayGraph:
-    def __init__(self) -> None:
-        self.cities: dict[str, City] = {}
-        self.adjacency: dict[str, list[tuple[str, float]]] = {}
-        self.plane_distances: dict[tuple[str, str], float] = {}
+    def __init__(self):
+        self.locations = {}  # city name -> (latitude, longitude)
+        self.roads = {}      # city name -> list of (neighbor, driving miles)
+        self.plane_miles = {}  # measured straight-line distance for listed edges
 
     @classmethod
-    def from_csv(cls, cities_path: Path, roads_path: Path) -> "HighwayGraph":
+    def from_csv(cls, city_file, road_file):
         graph = cls()
+        with open(city_file, newline="", encoding="utf-8") as file:
+            for row in csv.DictReader(file):
+                graph.add_city(row["city"], float(row["latitude"]),
+                               float(row["longitude"]))
 
-        with cities_path.open(newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                graph.add_city(
-                    row["city"],
-                    float(row["latitude"]),
-                    float(row["longitude"]),
-                )
-
-        with roads_path.open(newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                plane_raw = row.get("plane_miles", "")
-                plane_miles = float(plane_raw) if plane_raw not in ("", None) else None
-                graph.add_road(
-                    row["city_a"],
-                    row["city_b"],
-                    float(row["driving_miles"]),
-                    plane_miles,
-                )
-
+        with open(road_file, newline="", encoding="utf-8") as file:
+            for row in csv.DictReader(file):
+                graph.add_road(row["city_a"], row["city_b"],
+                               float(row["driving_miles"]),
+                               float(row["plane_miles"]) if row.get("plane_miles") else None)
         return graph
 
-    def add_city(self, name: str, latitude: float, longitude: float) -> None:
-        self.cities[name] = City(name, latitude, longitude)
-        self.adjacency.setdefault(name, [])
+    def add_city(self, name, latitude, longitude):
+        if name in self.locations:
+            raise ValueError(f"Duplicate city: {name}")
+        self.locations[name] = (latitude, longitude)
+        self.roads[name] = []
 
-    def add_road(
-        self,
-        city_a: str,
-        city_b: str,
-        driving_miles: float,
-        plane_miles: float | None = None,
-    ) -> None:
+    def validate_city(self, name):
+        if name not in self.locations:
+            choices = ", ".join(self.city_names())
+            raise ValueError(f"Unknown city: {name}. Choose from: {choices}")
+
+    def add_road(self, city_a, city_b, driving_miles, plane_miles=None):
         self.validate_city(city_a)
         self.validate_city(city_b)
+        if city_a == city_b or driving_miles <= 0:
+            raise ValueError("Roads must connect different cities with positive mileage")
+        if plane_miles is not None and (plane_miles < 0 or plane_miles > driving_miles):
+            raise ValueError("Straight-line mileage must be between zero and road mileage")
+        if any(name == city_b for name, _ in self.roads[city_a]):
+            raise ValueError(f"Duplicate road: {city_a} - {city_b}")
 
-        self.adjacency[city_a].append((city_b, driving_miles))
-        self.adjacency[city_b].append((city_a, driving_miles))
-
+        self.roads[city_a].append((city_b, driving_miles))
+        self.roads[city_b].append((city_a, driving_miles))
+        self.roads[city_a].sort()
+        self.roads[city_b].sort()
         if plane_miles is not None:
-            self.plane_distances[(city_a, city_b)] = plane_miles
-            self.plane_distances[(city_b, city_a)] = plane_miles
+            self.plane_miles[frozenset((city_a, city_b))] = plane_miles
 
-        self.adjacency[city_a].sort(key=lambda item: item[0])
-        self.adjacency[city_b].sort(key=lambda item: item[0])
+    def city_names(self):
+        return sorted(self.locations)
 
-    def validate_city(self, name: str) -> None:
-        if name not in self.cities:
-            available = ", ".join(sorted(self.cities))
-            raise ValueError(f"Unknown city '{name}'. Available cities: {available}")
-
-    def city_names(self) -> list[str]:
-        return sorted(self.cities)
-
-    def neighbors(self, city: str) -> list[tuple[str, float]]:
+    def neighbors(self, city):
         self.validate_city(city)
-        return list(self.adjacency[city])
+        return self.roads[city]
 
-    def edge_distance(self, city_a: str, city_b: str) -> float:
-        for neighbor, distance in self.adjacency[city_a]:
-            if neighbor == city_b:
-                return distance
-        raise ValueError(f"No direct road between {city_a} and {city_b}")
+    def path_distance(self, path):
+        total = 0
+        for city_a, city_b in zip(path, path[1:]):
+            matches = [miles for neighbor, miles in self.roads[city_a]
+                       if neighbor == city_b]
+            if not matches:
+                raise ValueError(f"No road between {city_a} and {city_b}")
+            total += matches[0]
+        return total
 
-    def collected_plane_distance(self, city_a: str, city_b: str) -> float | None:
-        """Return the team's collected Google Maps straight-line value for a direct pair."""
-        self.validate_city(city_a)
-        self.validate_city(city_b)
-        return self.plane_distances.get((city_a, city_b))
-
-    def path_distance(self, path: list[str]) -> float:
-        if len(path) < 2:
+    def heuristic_miles(self, city, goal):
+        """Use a collected straight-line distance, or estimate with Haversine."""
+        self.validate_city(city)
+        self.validate_city(goal)
+        if city == goal:
             return 0.0
-        return sum(
-            self.edge_distance(path[i], path[i + 1])
-            for i in range(len(path) - 1)
-        )
+        measured = self.plane_miles.get(frozenset((city, goal)))
+        if measured is not None:
+            return measured
 
-    def heuristic_miles(self, city_a: str, city_b: str) -> float:
-        """
-        Straight-line estimate h(n).
+        lat1, lon1 = self.locations[city]
+        lat2, lon2 = self.locations[goal]
+        lat1, lon1, lat2, lon2 = map(radians, (lat1, lon1, lat2, lon2))
+        part = sin((lat2 - lat1) / 2) ** 2
+        part += cos(lat1) * cos(lat2) * sin((lon2 - lon1) / 2) ** 2
+        return 2 * EARTH_RADIUS_MILES * asin(sqrt(min(1.0, part)))
 
-        If the team collected this exact city pair in Google Maps, use that
-        measured value. Otherwise compute the direct great-circle distance
-        from the city coordinates with the Haversine formula. This lets A*
-        evaluate any current-city/goal pair while preserving collected values
-        whenever they are available.
-        """
-        self.validate_city(city_a)
-        self.validate_city(city_b)
-
-        collected = self.collected_plane_distance(city_a, city_b)
-        if collected is not None:
-            return collected
-
-        a = self.cities[city_a]
-        b = self.cities[city_b]
-
-        lat1 = math.radians(a.latitude)
-        lon1 = math.radians(a.longitude)
-        lat2 = math.radians(b.latitude)
-        lon2 = math.radians(b.longitude)
-
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-
-        hav = (
-            math.sin(dlat / 2) ** 2
-            + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-        )
-        central_angle = 2 * math.asin(math.sqrt(hav))
-        return EARTH_RADIUS_MILES * central_angle
-
-    def estimated_flight_time_hours(self, city_a: str, city_b: str) -> float:
-        return self.heuristic_miles(city_a, city_b) / AIRPLANE_SPEED_MPH
+    def estimated_flight_time_hours(self, city, goal):
+        return self.heuristic_miles(city, goal) / PLANE_SPEED_MPH

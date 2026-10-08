@@ -1,183 +1,68 @@
 # Highway Search Algorithms
 
-A Python graph-search project that compares **Breadth-First Search (BFS)**, **Depth-First Search (DFS)**, **Uniform-Cost Search (UCS)**, and **A\*** on a U.S. highway-routing network built from the team's collected Google Maps data.
+This project compares four graph-search algorithms on the same small U.S. highway network: Breadth-First Search (BFS), Depth-First Search (DFS), Uniform-Cost Search (UCS), and A*.
 
-## Project Motivation
+## Data and route costs
 
-The project applies four classic AI search algorithms to a practical route-finding problem. Cities are graph nodes and the collected city-to-city highway connections are weighted graph edges.
+The data files contain 11 cities and 17 undirected road connections. Each road has a driving distance in miles. The original team-collected figures are retained in `data/google_maps_collected.csv`; the running program reads `data/roads.csv` and `data/cities.csv`.
 
-- **g(n):** accumulated driving distance in miles.
-- **h(n):** straight-line distance estimate to the target in miles.
-- **A\* evaluation:** `f(n) = g(n) + h(n)`.
-- **Airplane-time estimate:** `h(n) / 250 mph`, following the assignment assumption.
+- **BFS** uses a queue and finds a route with the fewest road connections.
+- **DFS** uses a stack and follows one branch before backtracking.
+- **UCS** chooses the path with the smallest driving-distance cost so far.
+- **A*** chooses a path according to `f(n) = g(n) + h(n)`, where `g(n)` is actual driving miles so far and `h(n)` estimates straight-line miles to the goal.
 
-## Dataset
+For a directly measured pair, A* uses the straight-line value recorded in the CSV. Otherwise it uses the Haversine formula and the coordinates in `cities.csv`. The flight-time comparison divides straight-line miles by the assignment's assumed 250 mph; flight time is **not** included in highway path cost.
 
-The final dataset contains **11 cities and 17 highway connections** collected by the team using Google Maps.
+## Start the program
 
-Cities:
-
-1. Saint Paul, Minnesota
-2. Springfield, Illinois
-3. Chicago, Illinois
-4. Indianapolis, Indiana
-5. Columbus, Ohio
-6. Nashville, Tennessee
-7. Atlanta, Georgia
-8. Columbia, South Carolina
-9. Washington, District of Columbia
-10. Philadelphia, Pennsylvania
-11. New York, New York
-
-The authoritative collected data is stored in:
-
-- `data/google_maps_collected.csv` - original normalized team data with road and plane distances.
-- `data/roads.csv` - program-ready weighted-edge dataset.
-- `data/cities.csv` - coordinates and state metadata used for mapping and heuristic fallback.
-
-For a city pair that appears directly in the collected data, the program uses the team's collected straight-line value for `h(n)`. For other current-city/goal combinations needed by A\*, the program computes a direct great-circle estimate using the Haversine formula.
-
-## Algorithms
-
-| Algorithm | Edge weights | Heuristic | Search strategy |
-|---|---:|---:|---|
-| BFS | No | No | Explores level by level |
-| DFS | No | No | Explores one branch deeply before backtracking |
-| UCS | Yes | No | Expands the path with the smallest accumulated driving distance |
-| A* | Yes | Yes | Expands the path with the smallest `g(n) + h(n)` |
-
-## Project Structure
-
-```text
-highway-search-algorithms/
-├── README.md
-├── main.py
-├── requirements.txt
-├── .gitignore
-├── data/
-│   ├── cities.csv
-│   ├── roads.csv
-│   ├── google_maps_collected.csv
-│   └── DATA_NOTES.md
-├── src/
-│   ├── __init__.py
-│   ├── graph.py
-│   ├── search.py
-│   └── visualization.py
-├── tests/
-│   └── test_search.py
-├── docs/
-│   ├── REPORT_OUTLINE.md
-│   ├── PRESENTATION_OUTLINE.md
-│   └── FINAL_RESULTS.md
-└── outputs/
-    └── .gitkeep
-```
-
-## Setup
+From the folder containing `main.py`, run:
 
 ```bash
-git clone https://github.com/Amereh11/highway-search-algorithms.git
-cd highway-search-algorithms
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
+python3 main.py --start "Saint Paul" --goal "New York" --algorithm all
 ```
 
-On Windows, activate the environment with:
+To produce four PNG maps inside `outputs/`:
 
 ```bash
-.venv\Scripts\activate
+python3 main.py --start "Saint Paul" --goal "New York" --algorithm all --save-maps
 ```
 
-## Run One Route
-
-Example: Saint Paul to New York using all four algorithms.
+For five repeatable random routes:
 
 ```bash
-python main.py --start "Saint Paul" --goal "New York" --algorithm all
+python3 main.py --random 5 --seed 42
 ```
 
-Save route-map images as well:
+To run automated checks:
 
 ```bash
-python main.py --start "Saint Paul" --goal "New York" --algorithm all --save-maps
+python3 -m unittest discover -s tests -v
 ```
 
-## Run Five Random Start/Target Pairs
+Valid algorithm choices are `bfs`, `dfs`, `ucs`, `astar`, and `all`. City names must exactly match the dataset. The available names appear in an error message if an invalid city is entered.
 
-```bash
-python main.py --random 5 --seed 42
-```
+## Understanding the code
 
-With route maps:
+Start with `main.py` for user input and printing; `src/graph.py` for the dataset and distance calculations; `src/search.py` for all four search methods; and `src/visualization.py` for map figures. `tests/test_search.py` checks the expected behavior, including comparing UCS and A* against independently computed shortest distances for all 121 ordered city pairs.
 
-```bash
-python main.py --random 5 --seed 42 --save-maps
-```
+This is an educational graph on selected connections, not a turn-by-turn navigation system. Road lengths are snapshot values, edges are undirected, and plotted lines connect city coordinates rather than tracing actual roads.
 
-## Verified Example: Saint Paul to New York
+## Main demonstration
 
-Using the team's final Google Maps road-distance dataset:
+Saint Paul to New York:
 
-| Algorithm | Route distance | Nodes expanded |
+| Search | Driving miles | Expanded cities |
 |---|---:|---:|
-| BFS | 1,287 mi | 11 |
-| DFS | 1,287 mi | 5 |
-| UCS | 1,287 mi | 10 |
-| A* | 1,287 mi | 6 |
+| BFS | 1287 | 11 |
+| DFS | 2356 | 10 |
+| UCS | 1287 | 10 |
+| A* | 1287 | 6 |
 
-All four algorithms found the same route for this case:
-
-`Saint Paul -> Chicago -> Columbus -> Philadelphia -> New York`
-
-The direct straight-line estimate from Saint Paul to New York is approximately **1,007.6 miles**, which corresponds to about **4.03 hours** at 250 mph.
-
-## Five Seeded Random Tests
-
-With `--random 5 --seed 42`, the program evaluates these start/goal pairs:
-
-1. Washington -> Chicago
-2. Atlanta -> Indianapolis
-3. Columbus -> Washington
-4. Columbia -> Chicago
-5. Washington -> Saint Paul
-
-Across these tests, UCS and A* return the same minimum-cost route distances, while A* generally expands fewer nodes because the heuristic guides the search toward the target.
-
-## Run Tests
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-The test suite checks:
-
-- all four algorithms can find a route,
-- the final dataset contains 11 cities and 17 edges,
-- UCS and A* agree on the optimal route cost for the main test,
-- collected straight-line data is used for direct pairs,
-- `h(goal) = 0`, and
-- the 250 mph flight-time calculation is correct.
-
-## Assignment Coverage
-
-This repository implements the programming requirements of the project:
-
-- 10-15 cities: **11 included**
-- highway connections across multiple states/regions
-- Google Maps driving distances for `g(n)`
-- straight-line estimates for `h(n)`
-- BFS
-- DFS
-- UCS
-- A*
-- user-selected start and target cities
-- five random start/target cases
-- route and distance output
-- map visualization
-- automated tests
+DFS returns a longer route here than the other three searches. The difference follows from its exploration order: it is not designed to minimize road miles. See the full report for the random-pair comparison.
 
 ## Team
 
-The project was completed collaboratively by **Motasem Amereh, Tammanna, Manjot, Thomas, and Parv**. Responsibilities were divided across data preparation, algorithm implementation, integration, testing, visualization, analysis, and documentation, with all contributions presented as equal parts of the final project.
+Motasem Amereh, Tamanna Devi, Manjot Singh, Thomas Zangrilli, and Parv Alphonso Bhatia.
+
+Team members should review and be able to explain their submitted implementation, results, and individual contributions in accordance with course policy.
