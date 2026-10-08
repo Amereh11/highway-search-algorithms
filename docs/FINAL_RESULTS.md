@@ -1,45 +1,33 @@
-# Final Experimental Results
+# Experiment results (2D adjacency-matrix version 3.0)
 
-Dataset: 11 cities, 17 team-collected Google Maps road connections.
+Dataset: 11 cities, 17 undirected roads. All 15 automated tests passed locally.
 
-## Main route: Saint Paul -> New York
+## Main case: Saint Paul → New York
 
-All four algorithms return:
+| Method | Driving miles | Expanded cities |
+|---|---:|---:|
+| BFS | 1287 | 11 |
+| DFS | 2356 | 10 |
+| UCS | 1287 | 10 |
+| A* | 1287 | 6 |
 
-`Saint Paul -> Chicago -> Columbus -> Philadelphia -> New York`
+The minimum route (BFS/UCS/A*): Saint Paul → Chicago → Columbus → Philadelphia → New York.
 
-Total driving distance: **1,287 miles**.
-
-| Algorithm | Nodes expanded |
-|---|---:|
-| BFS | 11 |
-| DFS | 5 |
-| UCS | 10 |
-| A* | 6 |
-
-Direct heuristic from Saint Paul to New York: approximately **1,007.6 miles**.
-Estimated direct-flight time at 250 mph: approximately **4.03 hours**.
-
-## Five seeded random tests (`--seed 42`)
+## Five seeded pairs (`python3 main.py --random 5 --seed 42`)
 
 | Start | Goal | BFS | DFS | UCS | A* |
 |---|---|---:|---:|---:|---:|
-| Washington | Chicago | 723 | 1,411 | 723 | 723 |
-| Atlanta | Indianapolis | 536 | 1,264 | 536 | 536 |
-| Columbus | Washington | 398 | 398 | 398 | 398 |
+| Washington | Chicago | 723 | 1411 | 723 | 723 |
+| Atlanta | Indianapolis | 536 | 964 | 536 | 536 |
+| Columbus | Washington | 398 | 1736 | 398 | 398 |
 | Columbia | Chicago | 933 | 933 | 933 | 933 |
-| Washington | Saint Paul | 1,121 | 1,809 | 1,121 | 1,121 |
+| Washington | Saint Paul | 1121 | 1809 | 1121 | 1121 |
 
-Average route distances:
+| Method | Average route miles | Average expanded |
+|---|---:|---:|
+| BFS | 742.2 | 7.4 |
+| DFS | 1370.6 | 6.4 |
+| UCS | 742.2 | 7.6 |
+| A* | 742.2 | 3.8 |
 
-- BFS: **742.2 miles**
-- DFS: **1,163.0 miles**
-- UCS: **742.2 miles**
-- A*: **742.2 miles**
-
-Average nodes expanded:
-
-- BFS: **7.4**
-- DFS: **7.4**
-- UCS: **7.6**
-- A*: **3.8**
+Numbers are based on the revised v3 source, not the earlier DFS results. Routes are over the selected 17 roads, not a full real-world road map.
