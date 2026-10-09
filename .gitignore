@@ -1,15 +1,6 @@
-# Python
 __pycache__/
 *.py[cod]
-*.egg-info/
+.pytest_cache/
+.DS_Store
 .venv/
 venv/
-
-# OS / editors
-.DS_Store
-.vscode/
-.idea/
-
-# Generated route images
-outputs/*.png
-!outputs/.gitkeep

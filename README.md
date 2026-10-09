@@ -1,44 +1,51 @@
-# Highway Search Algorithms — Version 3.0
+# Highway Search Algorithms
 
-**Course:** Introduction to Artificial Intelligence, Project 1  
-**Project team:** Motasem Amereh, Tamanna Devi, Manjot Singh, Thomas Zangrilli, Parv Alphonso Bhatia  
-**Updated:** October 8, 2026
+**Course:** CS (NW) 36210 002 — Introduction to Artificial Intelligence (Fall 2026)  
+**University:** Purdue University Northwest  
+**Report date:** October 8, 2026  
+**Team:** Motasem Amereh, Tamanna Devi, Manjot Singh, Thomas Zangrilli, Parv Alphonso Bhatia
 
-This version uses an **11 × 11 two-dimensional adjacency matrix** to represent 11 cities and 17 undirected roads. There is no set collection in the project code. BFS/DFS track visits with Boolean lists, and UCS/A* track their best known costs with lists.
+This project compares **Breadth-First Search (BFS)**, **Depth-First Search (DFS)**, **Uniform-Cost Search (UCS)**, and **A\*** on a highway network with 11 cities and 17 bidirectional roads.
+
+The road weights are driving miles, `g(n)`; A* also uses the team's straight-line distance estimates, `h(n)`. The program prints travel results and draws a four-panel visualization of the routes and city expansion orders. A direct-flight time at 250 mph is displayed separately; it does not affect route selection.
 
 ## Files
 
-- `main.py`: command-line inputs, results, optional plots
-- `src/graph.py`: two-dimensional distance matrix and straight-line estimates
-- `src/search.py`: BFS, DFS, UCS and A*
-- `src/visualization.py`: road graph and highlighted routes
-- `tests/test_search.py`: 15 tests, including all 121 ordered city pairs
-- `data/*.csv`: original road and city dataset
-- `docs/FINAL_RESULTS.md`: updated measured results
-- `docs/CODE_WALKTHROUGH.md`: explanation and professor-practice questions
+| File | Purpose |
+|---|---|
+| `highway_search.py` | Interactive menu, four algorithms, results, and Matplotlib maps |
+| `city_data.py` | City names, coordinates, 17 roads, and 55 straight-line distance pairs |
+| `tests/test_highway_search.py` | Checks against the report, route correctness, and graph data |
+| `docs/Highway_Search_Project_Report.pdf` | Full illustrated project report |
+| `assets/usa-city-map.png` | Reference map included in the supplied project archive |
+| `docs/RESULTS.md` | Quick reference for the reproducible results |
 
 ## Run
 
-From the project folder:
+Install Python 3.8+ and Matplotlib. From this folder:
 
 ```bash
 python3 -m pip install -r requirements.txt
 python3 -m unittest discover -s tests -v
-python3 main.py --start "Saint Paul" --goal "New York" --algorithm all
-python3 main.py --start "Saint Paul" --goal "New York" --algorithm all --save-maps
-python3 main.py --random 5 --seed 42
+python3 highway_search.py
 ```
 
-## Main demonstration
+In the menu, choose **1** to select the start and target city, **2** to run five reproducible random pairs, or **3** to exit. For the main report demonstration, enter **1**, choose **2 (Chicago)**, and then choose **10 (Atlanta)**. Close the figure window after each route to return to the menu; in random mode close each figure to see the next.
 
-| Algorithm | Route miles | Cities expanded |
+## Report example: Chicago → Atlanta
+
+| Search | Driving miles | Expanded cities |
 |---|---:|---:|
-| BFS | 1287 | 11 |
-| DFS | 2356 | 10 |
-| UCS | 1287 | 10 |
-| A* | 1287 | 6 |
+| BFS | 823 | 10 |
+| DFS | 3,046 | 10 |
+| UCS | 719 | 7 |
+| A* | 719 | 5 |
 
-BFS, UCS and A* return Saint Paul → Chicago → Columbus → Philadelphia → New York. DFS follows a longer route. A* uses `f(n)=g(n)+h(n)`, where both terms are in miles. Estimated direct-flight hours are shown separately as `h(n)/250`.
+UCS and A* find the shortest road route, **Chicago → Indianapolis → Nashville → Atlanta (719 miles)**. BFS chooses a different three-road route, and DFS follows a much longer route in this neighbor order.
 
-**Academic-use note:** This is a review draft for understanding and team revision. Follow the professor's independently-authored-work and assistance-disclosure requirements. Project-team file headers do not establish individual code authorship. The illustrated PDF/Word report is included in the downloadable submission ZIP, rather than this source-only branch.
+## Notes
 
+- **Distance data:** Values are the team's recorded project measurements, not live Google Maps queries; actual road distances can change.
+- **Algorithm comparison:** BFS minimizes the number of highway connections, not total driving miles. DFS does not promise a shortest path. UCS and A* minimize total miles on this network.
+- **Source version:** The Python source here matches the version-1.0 implementation described in the supplied project report. That implementation uses Python `set` objects for visited cities. If a **2D adjacency array with no sets** is a current requirement, revise the code **and the report appendix/explanation together** before submitting. An earlier matrix-based version is recoverable in the repository's Git history.
+- **Academic work:** Team members should review and understand the code and follow their course's authorship and assistance-disclosure rules.
